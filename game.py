@@ -203,6 +203,7 @@ class Player(Task):
         self.draw_player(world.you)
 
         self.draw_ball()
+        self.draw_game_over()
 
         pygame.display.flip()
 
@@ -237,6 +238,24 @@ class Player(Task):
         position, radius = ball.shape.pygame
 
         pygame.draw.circle(self.screen, color, position, radius)
+
+    def draw_game_over(self):
+        world = self.world
+        field = world.field
+
+        if not world.winner:
+            return
+
+        if world.winner is world.me: message = "You Win!"
+        if world.winner is world.you: message = "You Lose!"
+
+        width, height = self.font.size(message)
+        position = field.horizontal - width / 2, field.vertical - height / 2
+
+        color = settings.text_color
+        surface = self.font.render(message, True, color)
+
+        self.screen.blit(surface, position)
 
     # User Input Methods {{{1
     def react(self, time):

@@ -49,7 +49,7 @@ class GameEngine(SerialEngine):
         SerialEngine.teardown(self)
         self.game.teardown()
 
-    def exit(self):
+    def finished(self):
         return bool(self.world.winner)
 
 class PongLoop(Loop):
@@ -69,6 +69,27 @@ class PongEngine(GameEngine):
                 "triggers" : Triggers(world, publisher),
                 "player" : Player(world, publisher),
                 "opponent" : Opponent(world, publisher) }
+
+    def successor(self):
+        player = self.tasks["player"]
+        return PostgameEngine(self.loop, self.world, player)
+
+class PostgameEngine(Engine):
+
+    def __init__(self, loop, world, player):
+        Engine.__init__(self, loop)
+
+        self.world = world
+        self.player = player
+
+    def setup(self):
+        pass
+
+    def update(self, time):
+        self.player.update(time)
+
+    def teardown(self):
+        pass
 
 if __name__ == "__main__":
     loop = PongLoop()

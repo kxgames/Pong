@@ -8,7 +8,7 @@ field_shape = Rectangle.from_width(700)
 paddle_shape = Rectangle.from_size(4, 40)
 ball_shape = Circle.from_radius(5)
 
-paddle_speed = 100
+paddle_speed = 150
 ball_speed = 350
 ball_speedup = 20
 
