@@ -1,0 +1,6 @@
+[submodule "Utilities"]
+	path = Utilities
+	url = git@github.com:kxgames/Utilities.git
+[submodule "utilities"]
+	path = utilities
+	url = git@github.com:kxgames/Utilities.git
