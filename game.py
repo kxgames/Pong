@@ -1,4 +1,7 @@
+from __future__ import division
+
 import math
+import random
 import settings
 
 import pygame
@@ -6,6 +9,7 @@ from pygame.locals import *
 
 from utilities.core import Task
 from utilities.vector import Vector
+from utilities.messaging import Timer
 
 # Commands {{{
 class BounceBall(object):
@@ -13,6 +17,11 @@ class BounceBall(object):
     def __init__(self, top, left, bottom, right):
         self.top = top; self.bottom = bottom
         self.left = left; self.right = right
+
+class BlockBall(object):
+
+    def __init__(self, paddle):
+        self.paddle = paddle
 
 class ScorePoint(object):
 
@@ -33,17 +42,12 @@ class StopPaddle(object):
 
 # }}}1
 
-class Game:
+class Game(Task):
 
-    # Constructor {{{1
-    def __init__(self, world, forum):
-        self.world = world
-        self.forum = forum
-
-    # Game Loop {{{1
+    # Setup {{{1
     def setup(self):
-        forum = self.forum
-        world = self.world
+        world = self.world = self.engine.get_world()
+        forum = self.forum = self.engine.get_subscriber()
 
         me = world.me.shape; you = world.you.shape
         field = world.field
@@ -54,45 +58,58 @@ class Game:
 
         # Assume responsibility for managing the world.
         forum.subscribe(BounceBall, self.bounce_ball)
+        forum.subscribe(BlockBall, self.block_ball)
         forum.subscribe(ScorePoint, self.score_point)
 
         forum.subscribe(MovePaddle, self.move_paddle)
         forum.subscribe(StopPaddle, self.stop_paddle)
 
+    # Update {{{1
     def update(self, time):
         self.world.me.update(time)
         self.world.you.update(time)
         self.world.ball.update(time)
 
+    # Teardown {{{1
     def teardown(self):
         pass
 
-    # Event Handlers {{{1
+    # }}}1
+
+    # Bounce Ball {{{
     def bounce_ball(self, command):
         ball = self.world.ball
         field = self.world.field
 
-        vx, vy = ball.velocity
+        horizontal, vertical = ball.velocity
 
         if command.top:
-            vy = 1 * abs(vy)
+            vertical = 1 * abs(vertical)
             ball.shape.align_top(field)
 
         if command.bottom: 
-            vy = -1 * abs(vy)
+            vertical = -1 * abs(vertical)
             ball.shape.align_bottom(field)
 
         if command.left:
-            vx = 1 * abs(vx)
+            horizontal = 1 * abs(horizontal)
             ball.shape.align_left(field)
 
         if command.right:
-            vx = -1 * abs(vx)
+            horizontal = -1 * abs(horizontal)
             ball.shape.align_right(field)
 
-        velocity = Vector(vx, vy)
-        self.world.ball.velocity = velocity
+        self.world.ball.velocity = Vector(horizontal, vertical)
 
+    # Block Ball {{{1
+    def block_ball(self, command):
+        ball = self.world.ball
+        paddle = command.paddle
+
+        spin = paddle.velocity * settings.paddle_spin
+        ball.velocity += Vector(0, -spin)
+
+    # Score Point {{{1
     def score_point(self, command):
         player = command.player
         player.score += 1
@@ -100,14 +117,19 @@ class Game:
         if player.score == settings.winning_score:
             if not self.world.winner:
                 self.world.winner = player
+                self.engine.exit_engine()
 
+    # }}}1
+    
+    # Move Paddle {{{1
     def move_paddle(self, command):
         player = command.player
         velocity = settings.paddle_speed
 
-        if command.up: player.velocity -= velocity
-        if command.down: player.velocity += velocity
+        if command.up: player.velocity = -velocity
+        if command.down: player.velocity = velocity
 
+    # Stop Paddle {{{1
     def stop_paddle(self, command):
         player = command.player
         velocity = player.velocity
@@ -119,15 +141,12 @@ class Game:
 
 class Triggers(Task):
 
-    # Constructor {{{1
-    def __init__(self, world, forum):
-        self.world = world
-        self.forum = forum
-    
-    # Game Loop {{{1
+    # Setup {{{1
     def setup(self):
-        pass
+        self.world = self.engine.get_world()
+        self.forum = self.engine.get_publisher()
 
+    # Update {{{1
     def update(self, time):
         forum = self.forum
         world = self.world
@@ -135,6 +154,7 @@ class Triggers(Task):
         ball = self.world.ball.shape
         field = self.world.field
 
+        bounce = shot = None
         top, left, bottom, right = ball.inside(field)
 
         # Bounce the ball if it hits any of the walls.
@@ -149,14 +169,13 @@ class Triggers(Task):
         past_you = ball.bottom < you.shape.top or ball.top > you.shape.bottom 
 
         # Change the score if the ball wasn't blocked.
-        if left and past_me:
-            score = ScorePoint(you)
-            forum.publish(score)
+        if left: shot = ScorePoint(you) if past_me else BlockBall(me)
+        if right: shot = ScorePoint(me) if past_you else BlockBall(you)
 
-        if right and past_you:
-            score = ScorePoint(me)
-            forum.publish(score)
+        if left or right:
+            forum.publish(shot)
 
+    # Teardown {{{1
     def teardown(self):
         pass
 
@@ -164,17 +183,13 @@ class Triggers(Task):
 
 class Player(Task):
 
-    # Constructor {{{1
-    def __init__(self, world, forum):
-        self.world = world
-        self.forum = forum
-
-    # Game Loop {{{1
+    # Setup {{{1
     def setup(self):
         pygame.init()
 
         # Save references to other game systems.
-        self.world = self.world
+        self.world = self.engine.get_world()
+        self.forum = self.engine.get_publisher()
 
         # Create a window to run the game in.
         self.size = [ int(value) for value in self.world.field.size ]
@@ -182,11 +197,12 @@ class Player(Task):
 
         self.font = pygame.font.Font(None, settings.text_size)
 
+    # Update {{{1
     def update(self, time):
         self.draw(time)
-        if not self.world.winner:
-            self.react(time)
+        self.react(time)
 
+    # Teardown {{{1
     def teardown(self):
         pass
 
@@ -257,31 +273,33 @@ class Player(Task):
 
         self.screen.blit(surface, position)
 
-    # User Input Methods {{{1
+    # Input Methods {{{1
     def react(self, time):
         me = self.world.me
         forum = self.forum
 
         if pygame.event.get(QUIT):
-            pass
+            self.engine.exit_loop()
 
-        for event in pygame.event.get(KEYDOWN):
-            if event.key == settings.up_control:
-                move = MovePaddle(me, up=True)
-                forum.publish(move)
+        if not self.world.winner:
 
-            if event.key == settings.down_control:
-                move = MovePaddle(me, down=True)
-                forum.publish(move)
+            for event in pygame.event.get(KEYDOWN):
+                if event.key == settings.up_control:
+                    move = MovePaddle(me, up=True)
+                    forum.publish(move)
 
-        for event in pygame.event.get(KEYUP):
-            if event.key == settings.up_control:
-                move = StopPaddle(me, up=True)
-                forum.publish(move)
+                if event.key == settings.down_control:
+                    move = MovePaddle(me, down=True)
+                    forum.publish(move)
 
-            if event.key == settings.down_control:
-                move = StopPaddle(me, down=True)
-                forum.publish(move)
+            for event in pygame.event.get(KEYUP):
+                if event.key == settings.up_control:
+                    move = StopPaddle(me, up=True)
+                    forum.publish(move)
+
+                if event.key == settings.down_control:
+                    move = StopPaddle(me, down=True)
+                    forum.publish(move)
 
         pygame.event.clear()
 
@@ -290,18 +308,116 @@ class Player(Task):
 class Opponent(Task):
 
     # Constructor {{{1
-    def __init__(self, world, forum):
-        self.world = world
-        self.forum = forum
-    
-    # Game Loop {{{1
+    def __init__(self, engine):
+        Task.__init__(self, engine)
+        self.timer = Timer()
+
+    # }}}1
+
+    # Setup {{{1
     def setup(self):
-        pass
+        self.world = self.engine.get_world()
+        self.forum = self.engine.get_member()
 
+        UpdateDefense = Opponent.UpdateDefense
+        update_defense = UpdateDefense()
+
+        self.forum.subscribe(BounceBall, self.bounce_ball)
+        self.timer.subscribe(UpdateDefense, self.update_defense)
+        self.timer.lock()
+
+        self.timer.publish(update_defense, 0)
+
+    # Update {{{1
     def update(self, time):
-        pass
+        forum = self.forum
+        timer = self.timer
 
+        timer.deliver(time)
+
+        destination = self.destination
+        paddle = self.world.you
+
+        target_above = destination < paddle.shape.vertical
+        target_below = destination > paddle.shape.vertical
+        
+        tolerance = paddle.shape.height / 3
+
+        target_close =                                              \
+                destination > paddle.shape.top + tolerance and      \
+                destination < paddle.shape.bottom - tolerance
+
+        moving = paddle.velocity != 0
+        moving_up = paddle.velocity < 0
+        moving_down = paddle.velocity > 0
+
+        if target_close:
+            stop_paddle = StopPaddle(paddle, up=True, down=True)
+            if moving: forum.publish(stop_paddle)
+
+        elif target_above and not moving_up:
+            move_paddle = MovePaddle(paddle, up=True)
+            forum.publish(move_paddle)
+
+        elif target_below and not moving_down:
+            move_paddle = MovePaddle(paddle, down=True)
+            forum.publish(move_paddle)
+
+        else:
+            pass
+
+    # Teardown {{{1
     def teardown(self):
         pass
 
     # }}}1
+
+    # Bounce Ball {{{1
+    def bounce_ball(self, command):
+        position, bounces, time = self.prepare_defense()
+        update_defense = Opponent.UpdateDefense()
+
+        if command.left or command.right:
+            delay = time * settings.reaction_time
+            self.timer.publish(update_defense, delay)
+
+        if command.left:
+            delay = time * settings.adjustment_time
+            self.timer.publish(update_defense, delay)
+
+    # Update Defense {{{1
+    def update_defense(self, command):
+        position, bounces, time = self.prepare_defense()
+
+        confusion = pow(bounces + 1, settings.bounce_penalty)
+        sloppiness = time * confusion * settings.foresight_penalty
+
+        self.destination = random.gauss(position, sloppiness)
+
+    # Prepare Defense {{{1
+    def prepare_defense(self):
+        ball = self.world.ball
+        field = self.world.field
+
+        direction = cmp(ball.velocity.x, 0)
+
+        dx = field.width - direction * ball.shape.horizontal
+        dy = dx * ball.velocity.y / abs(ball.velocity.x)
+
+        position = dy + ball.shape.vertical
+        bounces = position // field.height
+        time = abs(dx / ball.velocity.x)
+
+        position = position - bounces * field.height
+        if bounces % 2: position = field.height - position
+
+        return position, abs(bounces), time
+
+    # }}}1
+
+    # Update Message {{{1
+    class UpdateDefense(object):
+        pass
+
+    #}}}1
+

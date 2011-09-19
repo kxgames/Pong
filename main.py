@@ -15,9 +15,10 @@ class GameEngine(SerialEngine):
 
         self.publisher = self.forum.get_publisher()
         self.subscriber = self.forum.get_subscriber()
+        self.member = self.forum.get_member()
 
         self.world = World()
-        self.game = Game(self.world, self.subscriber)
+        self.game = Game(self)
 
         self.tasks = {}
 
@@ -33,10 +34,13 @@ class GameEngine(SerialEngine):
     def get_subscriber(self):
         return self.subscriber
 
+    def get_member(self):
+        return self.member
+
     def setup(self):
+        self.game.setup()
         SerialEngine.setup(self)
 
-        self.game.setup()
         self.forum.lock()
 
     def update(self, time):
@@ -49,9 +53,6 @@ class GameEngine(SerialEngine):
         SerialEngine.teardown(self)
         self.game.teardown()
 
-    def finished(self):
-        return bool(self.world.winner)
-
 class PongLoop(Loop):
 
     def __init__(self):
@@ -62,13 +63,10 @@ class PongEngine(GameEngine):
     def __init__(self, loop):
         GameEngine.__init__(self, loop)
 
-        world = self.world
-        publisher = self.publisher
-
         self.tasks = {
-                "triggers" : Triggers(world, publisher),
-                "player" : Player(world, publisher),
-                "opponent" : Opponent(world, publisher) }
+                "triggers" : Triggers(self),
+                "player" : Player(self),
+                "opponent" : Opponent(self) }
 
     def successor(self):
         player = self.tasks["player"]
@@ -82,14 +80,11 @@ class PostgameEngine(Engine):
         self.world = world
         self.player = player
 
-    def setup(self):
-        pass
+    def setup(self): pass
+    def teardown(self): pass
 
     def update(self, time):
         self.player.update(time)
-
-    def teardown(self):
-        pass
 
 if __name__ == "__main__":
     loop = PongLoop()

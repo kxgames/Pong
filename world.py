@@ -32,6 +32,8 @@ class Paddle(Sprite):
         self.shape = settings.paddle_shape.copy()
         self.velocity = 0
         self.score = 0
+        self.target = Vector(0, 0)
+
 
     def update(self, time):
         direction = Vector(0, 1)
@@ -42,9 +44,15 @@ class Ball(Sprite):
 
     def __init__(self):
         Sprite.__init__(self)
+
+        speed = settings.ball_speed
+        direction = Vector.random()
+
+        x, y = abs(direction)
+        if y > x: direction = direction.orthogonal
+
         self.shape = settings.ball_shape
-        self.velocity = Vector.random(settings.ball_speed)
-        #self.velocity = Vector(-settings.ball_speed, 0)
+        self.velocity = speed * direction
 
     def update(self, time):
         displacement = self.velocity * time
