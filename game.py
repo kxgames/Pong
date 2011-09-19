@@ -184,50 +184,149 @@ class Triggers(Task):
 class Player(Task):
 
     # Setup {{{1
-    def setup(self):
+    def reset(self, engine):
+        self.engine = engine
+        return self
+
+    def setup_pregame(self):
         pygame.init()
 
-        # Save references to other game systems.
-        self.world = self.engine.get_world()
-        self.forum = self.engine.get_publisher()
+        self.world = self.engine.world
+        self.font = pygame.font.Font(None, settings.text_size)
 
-        # Create a window to run the game in.
         self.size = [ int(value) for value in self.world.field.size ]
         self.screen = pygame.display.set_mode(self.size)
 
-        self.font = pygame.font.Font(None, settings.text_size)
+    def setup_game(self):
+        self.world = self.engine.get_world()
+        self.forum = self.engine.get_publisher()
 
-    # Update {{{1
-    def update(self, time):
-        self.draw(time)
-        self.react(time)
-
-    # Teardown {{{1
-    def teardown(self):
+    def setup_postgame(self):
         pass
 
-    # }}}1
+    setup = setup_game
 
-    # Drawing Methods {{{1
-    def draw(self, time):
-        world = self.world
-        screen = self.screen
+    # Update {{{1
+    def update_pregame(self, time):
+        self.handle_quit()
 
-        screen.fill(settings.background_color)
+        self.draw_background()
 
-        self.draw_player(world.me)
-        self.draw_player(world.you)
+        self.draw_paddle(self.world.me)
+        self.draw_paddle(self.world.you)
 
-        self.draw_ball()
-        self.draw_game_over()
+        countdown = math.ceil(self.engine.countdown)
+        message = "%d" % countdown
+
+        self.draw_message(message)
 
         pygame.display.flip()
 
-    def draw_player(self, player):
+    def update_game(self, time):
+        self.handle_quit()
+        self.handle_input()
+
+        self.draw_background()
+        self.draw_ball()
+
+        me = self.world.me
+        you = self.world.you
+
+        self.draw_paddle(me);   self.draw_score(me)
+        self.draw_paddle(you);  self.draw_score(you)
+
+        pygame.display.flip()
+
+    def update_postgame(self, time):
+        self.handle_quit()
+
+        world = self.engine.world
+        message = "You Win!" if world.winner is world.me else "You Lose!"
+
+        self.draw_background()
+        self.draw_ball()
+
+        self.draw_paddle(world.me);     self.draw_score(world.me)
+        self.draw_paddle(world.you);    self.draw_score(world.you)
+
+        self.draw_message(message)
+
+        pygame.display.flip()
+
+    update = update_game
+
+    # Teardown {{{1
+    def teardown_pregame(self): pass
+    def teardown_game(self): pass
+    def teardown_postgame(self): pass
+
+    teardown = teardown_game
+
+    # }}}1
+
+    # Input Methods {{{1
+    def handle_quit(self):
+        if pygame.event.get(QUIT):
+            self.engine.exit_loop()
+
+    def handle_input(self):
+        me = self.world.me
+        forum = self.forum
+
+        for event in pygame.event.get(KEYDOWN):
+            if event.key == settings.up_control:
+                move = MovePaddle(me, up=True)
+                forum.publish(move)
+
+            if event.key == settings.down_control:
+                move = MovePaddle(me, down=True)
+                forum.publish(move)
+
+        for event in pygame.event.get(KEYUP):
+            if event.key == settings.up_control:
+                move = StopPaddle(me, up=True)
+                forum.publish(move)
+
+            if event.key == settings.down_control:
+                move = StopPaddle(me, down=True)
+                forum.publish(move)
+
+        pygame.event.clear()
+
+    # Drawing Methods {{{1
+    def draw_background(self):
+        self.screen.fill(settings.background_color)
+
+    def draw_message(self, message):
         world = self.world
         field = world.field
 
-        # Draw the player's score.
+        width, height = self.font.size(message)
+        position = field.horizontal - width / 2, field.vertical - height / 2
+
+        color = settings.text_color
+        surface = self.font.render(message, True, color)
+
+        self.screen.blit(surface, position)
+
+    def draw_ball(self):
+        ball = self.world.ball
+
+        color = settings.foreground_color
+        position, radius = ball.shape.pygame
+
+        pygame.draw.circle(self.screen, color, position, radius)
+
+    def draw_paddle(self, player):
+        color = settings.foreground_color
+        dimensions = player.shape.pygame
+
+        pygame.draw.rect(self.screen, color, dimensions)
+
+    def draw_score(self, player):
+        world = self.world
+        field = world.field
+
         score = str(player.score)
         color = settings.text_color
 
@@ -240,68 +339,6 @@ class Player(Task):
 
         text = self.font.render(score, True, color)
         self.screen.blit(text, position)
-
-        # Draw the player's paddle.
-        color = settings.foreground_color
-        dimensions = player.shape.pygame
-
-        pygame.draw.rect(self.screen, color, dimensions)
-
-    def draw_ball(self):
-        ball = self.world.ball
-
-        color = settings.foreground_color
-        position, radius = ball.shape.pygame
-
-        pygame.draw.circle(self.screen, color, position, radius)
-
-    def draw_game_over(self):
-        world = self.world
-        field = world.field
-
-        if not world.winner:
-            return
-
-        if world.winner is world.me: message = "You Win!"
-        if world.winner is world.you: message = "You Lose!"
-
-        width, height = self.font.size(message)
-        position = field.horizontal - width / 2, field.vertical - height / 2
-
-        color = settings.text_color
-        surface = self.font.render(message, True, color)
-
-        self.screen.blit(surface, position)
-
-    # Input Methods {{{1
-    def react(self, time):
-        me = self.world.me
-        forum = self.forum
-
-        if pygame.event.get(QUIT):
-            self.engine.exit_loop()
-
-        if not self.world.winner:
-
-            for event in pygame.event.get(KEYDOWN):
-                if event.key == settings.up_control:
-                    move = MovePaddle(me, up=True)
-                    forum.publish(move)
-
-                if event.key == settings.down_control:
-                    move = MovePaddle(me, down=True)
-                    forum.publish(move)
-
-            for event in pygame.event.get(KEYUP):
-                if event.key == settings.up_control:
-                    move = StopPaddle(me, up=True)
-                    forum.publish(move)
-
-                if event.key == settings.down_control:
-                    move = StopPaddle(me, down=True)
-                    forum.publish(move)
-
-        pygame.event.clear()
 
     # }}}1
 
@@ -327,6 +364,7 @@ class Opponent(Task):
         self.timer.lock()
 
         self.timer.publish(update_defense, 0)
+        self.timer.publish(update_defense, settings.reaction_time)
 
     # Update {{{1
     def update(self, time):
