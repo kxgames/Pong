@@ -3,6 +3,7 @@ from pygame.locals import *
 from utilities.shapes import *
 
 # Gameplay Parameters
+countdown = 3
 winning_score = 5
 
 field_shape = Rectangle.from_width(700)
@@ -11,14 +12,14 @@ ball_shape = Circle.from_radius(5)
 
 paddle_spin = 0.5
 paddle_speed = 150
-ball_speed = 400
+ball_speed = 420
 
 # Computer Opponent Parameters
 reaction_time = 0.3
 adjustment_time = 0.7
 
-bounce_penalty = 1.9
-foresight_penalty = 20
+bounce_penalty = 2.0
+foresight_penalty = 15
 
 # User Interface Parameters
 up_control = K_k
