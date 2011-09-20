@@ -23,11 +23,10 @@ class PregameEngine(GameEngine):
         self.world = World()
         self.player = Player(self)
 
-        self.countdown = settings.countdown
-
     # Game Loop {{{1
     def setup(self):
         self.player.setup_pregame()
+        self.countdown = settings.countdown
 
     def update(self, time):
         self.player.update_pregame(time)
