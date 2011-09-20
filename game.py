@@ -379,7 +379,7 @@ class Opponent(Task):
         target_above = destination < paddle.shape.vertical
         target_below = destination > paddle.shape.vertical
         
-        tolerance = paddle.shape.height / 3
+        tolerance = paddle.shape.height / 4
 
         target_close =                                              \
                 destination > paddle.shape.top + tolerance and      \
@@ -412,7 +412,7 @@ class Opponent(Task):
 
     # Bounce Ball {{{1
     def bounce_ball(self, command):
-        position, bounces, time = self.prepare_defense()
+        position, speed, bounces, time = self.prepare_defense()
         update_defense = Opponent.UpdateDefense()
 
         if command.left or command.right:
@@ -425,12 +425,12 @@ class Opponent(Task):
 
     # Update Defense {{{1
     def update_defense(self, command):
-        position, bounces, time = self.prepare_defense()
+        position, speed, bounces, time = self.prepare_defense()
 
         confusion = pow(bounces + 1, settings.bounce_penalty)
-        sloppiness = time * confusion * settings.foresight_penalty
+        sloppiness = speed * settings.foresight_penalty / 100
 
-        self.destination = random.gauss(position, sloppiness)
+        self.destination = random.gauss(position, confusion * sloppiness)
 
     # Prepare Defense {{{1
     def prepare_defense(self):
@@ -444,12 +444,14 @@ class Opponent(Task):
 
         position = dy + ball.shape.vertical
         bounces = position // field.height
+
         time = abs(dx / ball.velocity.x)
+        speed = abs(ball.velocity.y)
 
         position = position - bounces * field.height
         if bounces % 2: position = field.height - position
 
-        return position, abs(bounces), time
+        return position, speed, abs(bounces), time
 
     # }}}1
 
