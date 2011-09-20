@@ -19,7 +19,7 @@ reaction_time = 0.3
 adjustment_time = 0.8
 
 bounce_penalty = 2.2
-foresight_penalty = 2.9
+foresight_penalty = 4.4
 
 # User Interface Parameters
 up_control = K_k
