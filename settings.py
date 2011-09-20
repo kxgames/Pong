@@ -16,10 +16,10 @@ ball_speed = 420
 
 # Computer Opponent Parameters
 reaction_time = 0.3
-adjustment_time = 0.7
+adjustment_time = 0.8
 
-bounce_penalty = 2.3
-foresight_penalty = 4.1
+bounce_penalty = 2.2
+foresight_penalty = 2.9
 
 # User Interface Parameters
 up_control = K_k
