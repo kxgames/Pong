@@ -6,61 +6,6 @@ from world import *
 from utilities.core import *
 from utilities.messaging import Forum
 
-class GameEngine(SerialEngine):
-
-    # Constructor {{{1
-    def __init__(self, loop):
-        SerialEngine.__init__(self, loop)
-
-        self.forum = Forum()
-
-        self.publisher = self.forum.get_publisher()
-        self.subscriber = self.forum.get_subscriber()
-        self.member = self.forum.get_member()
-
-        self.world = World()
-        self.game = Game(self)
-
-        self.tasks = {}
-
-    # Attributes {{{1
-    def get_world(self):
-        return self.world
-
-    def get_game(self):
-        return self.game
-
-    def get_publisher(self):
-        return self.publisher
-
-    def get_subscriber(self):
-        return self.subscriber
-
-    def get_member(self):
-        return self.member
-    # }}}1
-
-    # Setup {{{1
-    def setup(self):
-        self.game.setup()
-        SerialEngine.setup(self)
-
-        self.forum.lock()
-
-    # Update {{{1
-    def update(self, time):
-        SerialEngine.update(self, time)
-
-        self.forum.deliver()
-        self.game.update(time)
-
-    # Teardown {{{1
-    def teardown(self):
-        SerialEngine.teardown(self)
-        self.game.teardown()
-
-    # }}}1
-
 class PongLoop(Loop):
 
     # Constructor {{{1
@@ -107,6 +52,7 @@ class PongEngine(GameEngine):
         GameEngine.__init__(self, loop)
 
         self.world = world
+        self.game = Game(self)
 
         self.tasks = {
                 "triggers" : Triggers(self),
