@@ -18,8 +18,8 @@ ball_speed = 420
 reaction_time = 0.3
 adjustment_time = 0.8
 
-bounce_penalty = 2.2
-foresight_penalty = 4.4
+bounce_penalty = 2.7
+foresight_penalty = 3.6
 
 # User Interface Parameters
 up_control = K_k

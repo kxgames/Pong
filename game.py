@@ -428,7 +428,7 @@ class Opponent(Task):
         position, speed, bounces, time = self.prepare_defense()
 
         confusion = pow(bounces + 1, settings.bounce_penalty)
-        sloppiness = speed * settings.foresight_penalty / 100
+        sloppiness = time * speed * settings.foresight_penalty / 100
 
         self.destination = random.gauss(position, confusion * sloppiness)
 
